@@ -14,26 +14,25 @@ type ClientService interface {
 }
 
 type Service struct {
-	config  util.Config
+	config  util.ConfigData
 	client  util.RequestBuilder
 	baseUrl string
 }
 
-func NewService() ClientService {
+func NewService(application *util.Zilla) ClientService {
 	service := new(Service)
-	c := util.GetConfig()
-	service.config = c
+	service.config = *application.Config
 	service.client = util.NewHTTP().
 		WithHeader("Accept", "application/json")
-	if c.Jira.CustomDomain != "" {
-		service.baseUrl = c.Jira.CustomDomain
+	if service.config.Jira.CustomDomain != "" {
+		service.baseUrl = service.config.Jira.CustomDomain
 	} else {
-		service.baseUrl = fmt.Sprintf("https://%s.atlassian.net", c.Jira.Orgname)
+		service.baseUrl = fmt.Sprintf("https://%s.atlassian.net", service.config.Jira.Orgname)
 	}
-	if c.Jira.Apikey != "" {
-		service.client = service.client.WithBasicAuth(c.Jira.Username, c.Jira.Apikey)
+	if service.config.Jira.Apikey != "" {
+		service.client = service.client.WithBasicAuth(service.config.Jira.Username, service.config.Jira.Apikey)
 	} else {
-		service.client = service.client.WithHeader("Authorization", fmt.Sprintf("Bearer: %s", c.Jira.AccessToken))
+		service.client = service.client.WithHeader("Authorization", fmt.Sprintf("Bearer: %s", service.config.Jira.AccessToken))
 	}
 	return service
 }

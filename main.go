@@ -1,17 +1,5 @@
 package main
 
-//import (
-//	"fmt"
-//	"github.com/trevor-atlas/zilla/jira"
-//)
-//
-//func main() {
-//	//cached := util.GetCachedIssues()
-//	jiraClient := jira.NewService()
-//	issues := jiraClient.GetMappedCustomFields()
-//	fmt.Printf("\n%#v \n", issues)
-//}
-
 import (
 	"context"
 	"fmt"
@@ -21,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/trevor-atlas/zilla/jira"
+	"github.com/trevor-atlas/zilla/util"
 	"os"
 	"strings"
 )
@@ -41,21 +30,10 @@ func (i item) Description() string { return i.desc }
 func (i item) FilterValue() string { return i.title }
 
 func main() {
-	t := textinput.New()
-	t.Focus()
+	app := util.New()
+	service := jira.NewService(app)
+	initialModel := createModel(app, service)
 
-	s := spinner.New()
-	s.Spinner = spinner.Dot
-	service := jira.NewService()
-
-	items := []list.Item{}
-	initialModel := Model{
-		textInput:  t,
-		spinner:    s,
-		typing:     true,
-		jiraClient: service,
-		list:       list.New(items, list.NewDefaultDelegate(), 0, 0),
-	}
 	err := tea.NewProgram(initialModel, tea.WithAltScreen()).Start()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -63,7 +41,26 @@ func main() {
 	}
 }
 
+func createModel(app *util.Zilla, service jira.ClientService) Model {
+	t := textinput.New()
+	t.Focus()
+
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	var items []list.Item
+	model := Model{
+		app:        *app,
+		textInput:  t,
+		spinner:    s,
+		typing:     true,
+		jiraClient: service,
+		list:       list.New(items, list.NewDefaultDelegate(), 0, 0),
+	}
+	return model
+}
+
 type Model struct {
+	app        util.Zilla
 	textInput  textinput.Model
 	spinner    spinner.Model
 	jiraClient jira.ClientService
@@ -154,7 +151,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.WindowSizeMsg:
-		m.list.SetSize((msg.Width/3)-1, msg.Height)
+		m.list.SetSize(msg.Width/3-1, msg.Height)
 		style.Width((msg.Width / 3) * 2).Height(msg.Height)
 		return m, nil
 
