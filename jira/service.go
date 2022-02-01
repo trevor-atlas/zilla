@@ -78,15 +78,13 @@ func (s *Service) getFieldsList(ctx context.Context) ([]Field, error) {
 	client := s.client.Url(url)
 	res, err := client.GET()
 	if err != nil {
-		fmt.Printf("error making fields request")
-		panic(err)
+		return nil, fmt.Errorf("error making fields request")
 	}
 
 	var fieldList []Field
 	parseError := json.Unmarshal(res, &fieldList)
 	if parseError != nil {
-		fmt.Printf("error parsing fields json\n %s", parseError)
-		panic(parseError)
+		return nil, fmt.Errorf("error parsing fields json\n %s", parseError)
 	}
 	return fieldList, nil
 }

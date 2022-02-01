@@ -16,21 +16,25 @@ import (
 	"context"
 	"fmt"
 	"github.com/charmbracelet/bubbles/list"
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/trevor-atlas/zilla/jira"
 	"os"
 	"strings"
-
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
 )
-
-var docStyle = lipgloss.NewStyle().Margin(1, 2)
 
 type item struct {
 	title, desc string
 }
+
+var docStyle = lipgloss.NewStyle()
+var style = lipgloss.NewStyle().
+	Foreground(lipgloss.Color("#FAFAFA")).
+	Background(lipgloss.Color("#44EEFF")).
+	Border(lipgloss.NormalBorder(), false, false, false, true).
+	PaddingTop(2)
 
 func (i item) Title() string       { return i.title }
 func (i item) Description() string { return i.desc }
@@ -44,11 +48,13 @@ func main() {
 	s.Spinner = spinner.Dot
 	service := jira.NewService()
 
+	items := []list.Item{}
 	initialModel := Model{
 		textInput:  t,
 		spinner:    s,
 		typing:     true,
 		jiraClient: service,
+		list:       list.New(items, list.NewDefaultDelegate(), 0, 0),
 	}
 	err := tea.NewProgram(initialModel, tea.WithAltScreen()).Start()
 	if err != nil {
@@ -119,6 +125,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case GotIssues:
 		m.loading = false
+		m.typing = false
 
 		if err := msg.Err; err != nil {
 			m.err = err
@@ -126,13 +133,32 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		m.issues = msg.Issues
+		m.list.Title = "Issues"
+
+		for i, issue := range m.issues.Issues {
+			m.list.InsertItem(i, item{title: issue.Key, desc: issue.Fields.Summary})
+		}
+		m.list.InsertItem(0, item{title: "COM-2156", desc: "IE-11 babel config support"})
+		m.list.InsertItem(1, item{title: "COM-3121", desc: "IE-11 polyfills"})
+		m.list.InsertItem(2, item{title: "COM-4199", desc: "convert to typescript"})
+		m.list.InsertItem(3, item{title: "COM-2156", desc: "IE-11 babel config support"})
+		m.list.InsertItem(4, item{title: "COM-3121", desc: "IE-11 polyfills"})
+		m.list.InsertItem(5, item{title: "COM-4129", desc: "convert to typescript"})
+		m.list.InsertItem(6, item{title: "COM-2156", desc: "IE-11 babel config support"})
+		m.list.InsertItem(7, item{title: "COM-3121", desc: "IE-11 polyfills"})
+		m.list.InsertItem(8, item{title: "COM-4139", desc: "convert to typescript"})
+		m.list.InsertItem(9, item{title: "COM-2156", desc: "IE-11 babel config support"})
+		m.list.InsertItem(10, item{title: "COM-3121", desc: "IE-11 polyfills"})
+		m.list.InsertItem(11, item{title: "COM-4199", desc: "convert to typescript"})
+
 		return m, nil
+
+	case tea.WindowSizeMsg:
+		m.list.SetSize((msg.Width/3)-1, msg.Height)
+		style.Width((msg.Width / 3) * 2).Height(msg.Height)
+		return m, nil
+
 	}
-	//case tea.WindowSizeMsg:
-	//	top, right, bottom, left := docStyle.GetMargin()
-	//	m.list.SetSize(msg.Width-left-right, msg.Height-top-bottom)
-	//	return m, nil
-	//}
 
 	if m.typing {
 		var cmd tea.Cmd
@@ -146,7 +172,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	return m, nil
+	var cmd tea.Cmd
+	m.list, cmd = m.list.Update(msg)
+	return m, cmd
 }
 
 func (m Model) View() string {
@@ -161,12 +189,6 @@ func (m Model) View() string {
 	if err := m.err; err != nil {
 		return fmt.Sprintf("Could not fetch issues: %v", err)
 	}
-	items := []list.Item{}
-	for _, issue := range m.issues.Issues {
-		items = append(items, item{title: issue.Key, desc: issue.Fields.Summary})
-	}
-	m.list = list.New(items, list.NewDefaultDelegate(), 0, 0)
-	m.list.Title = "Issues"
 
-	return docStyle.Render(m.list.View())
+	return lipgloss.JoinHorizontal(lipgloss.Top, m.list.View(), style.Render("Ticket details"))
 }

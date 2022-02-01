@@ -2,7 +2,6 @@ package util
 
 import (
 	"encoding/base64"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -73,10 +72,8 @@ func (h *HTTP) GET() ([]byte, error) {
 		}
 	}
 	resp, reqErr := h.client.Do(h.request)
-	fmt.Printf("#%v\n", resp)
 
 	if reqErr != nil {
-		fmt.Println(reqErr)
 		return nil, reqErr
 	}
 
@@ -84,7 +81,6 @@ func (h *HTTP) GET() ([]byte, error) {
 
 	contents, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 
