@@ -6,6 +6,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/trevor-atlas/zilla/jira"
@@ -52,6 +53,7 @@ func createModel(app *util.Zilla, service jira.ClientService) Model {
 		app:        *app,
 		textInput:  t,
 		spinner:    s,
+		viewport:   viewport.New(0, 0),
 		typing:     true,
 		jiraClient: service,
 		list:       list.New(items, list.NewDefaultDelegate(), 0, 0),
@@ -65,11 +67,13 @@ type Model struct {
 	spinner    spinner.Model
 	jiraClient jira.ClientService
 
-	typing  bool
-	loading bool
-	err     error
-	issues  jira.JiraIssues
-	list    list.Model
+	viewport viewport.Model
+	ready    bool
+	typing   bool
+	loading  bool
+	err      error
+	issues   jira.JiraIssues
+	list     list.Model
 }
 
 type GotIssues struct {
@@ -93,8 +97,11 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var (
+		cmd  tea.Cmd
+		cmds []tea.Cmd
+	)
 	switch msg := msg.(type) {
-
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
@@ -129,32 +136,84 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		m.issues = msg.Issues
-		m.list.Title = "Issues"
+		var issues jira.JiraIssues
+		for i, _ := range m.issues.Issues {
+			mockissue := jira.JiraIssue{
+				ID:   fmt.Sprintf("%s", i),
+				Self: fmt.Sprintf("%s", i),
+				Key:  fmt.Sprintf("ABC-%s", i),
+				Fields: jira.IssueFields{
+					Summary:     "an issue summary",
+					Created:     nil,
+					Updated:     nil,
+					Description: "Bacon ipsum dolor amet pig turkey bresaola, jowl fatback venison t-bone andouille. Boudin pork belly chicken meatball, short ribs shankle pork t-bone cow biltong doner. Brisket short ribs ribeye frankfurter pork loin buffalo shank picanha tenderloin turducken boudin pig. Picanha cupim ham ham hock burgdoggen pancetta chicken spare ribs salami landjaeger sausage brisket bacon kevin tenderloin.",
+					Reporter: jira.IssueUser{
+						Active:       false,
+						TimeZone:     "",
+						DisplayName:  "",
+						Name:         "",
+						EmailAddress: "",
+						AvatarUrls:   nil,
+						AccountId:    "",
+						Key:          "",
+						Self:         "",
+					},
+					Assignee: jira.IssueUser{
+						Active:       false,
+						TimeZone:     "",
+						DisplayName:  "",
+						Name:         "",
+						EmailAddress: "",
+						AvatarUrls:   nil,
+						AccountId:    "",
+						Key:          "",
+						Self:         "",
+					},
+					Comment:   jira.IssueComments{},
+					Priority:  jira.IssuePriority{},
+					IssueType: jira.IssueType{},
+					Status:    jira.IssueStatus{},
+					Project:   jira.IssueProject{},
+				},
+			}
+			issues.Issues = append(issues.Issues, mockissue)
 
-		for i, issue := range m.issues.Issues {
-			m.list.InsertItem(i, item{title: issue.Key, desc: issue.Fields.Summary})
+			m.list.InsertItem(i, item{title: mockissue.Key, desc: mockissue.Fields.Summary})
+
+			m.issues = issues //msg.Issues
+			m.list.Title = "Issues"
 		}
-		m.list.InsertItem(0, item{title: "COM-2156", desc: "IE-11 babel config support"})
-		m.list.InsertItem(1, item{title: "COM-3121", desc: "IE-11 polyfills"})
-		m.list.InsertItem(2, item{title: "COM-4199", desc: "convert to typescript"})
-		m.list.InsertItem(3, item{title: "COM-2156", desc: "IE-11 babel config support"})
-		m.list.InsertItem(4, item{title: "COM-3121", desc: "IE-11 polyfills"})
-		m.list.InsertItem(5, item{title: "COM-4129", desc: "convert to typescript"})
-		m.list.InsertItem(6, item{title: "COM-2156", desc: "IE-11 babel config support"})
-		m.list.InsertItem(7, item{title: "COM-3121", desc: "IE-11 polyfills"})
-		m.list.InsertItem(8, item{title: "COM-4139", desc: "convert to typescript"})
-		m.list.InsertItem(9, item{title: "COM-2156", desc: "IE-11 babel config support"})
-		m.list.InsertItem(10, item{title: "COM-3121", desc: "IE-11 polyfills"})
-		m.list.InsertItem(11, item{title: "COM-4199", desc: "convert to typescript"})
 
 		return m, nil
 
 	case tea.WindowSizeMsg:
 		m.list.SetSize(msg.Width/3-1, msg.Height)
-		style.Width((msg.Width / 3) * 2).Height(msg.Height)
-		return m, nil
+		contentWidth := (msg.Width / 3) * 2
+		style.Width(contentWidth).Height(msg.Height)
 
+		if !m.ready {
+			// Since this program is using the full size of the viewport we
+			// need to wait until we've received the window dimensions before
+			// we can initialize the viewport. The initial dimensions come in
+			// quickly, though asynchronously, which is why we wait for them
+			// here.
+			m.viewport = viewport.New(contentWidth, msg.Height)
+			//m.viewport.YPosition = headerHeight
+			//m.viewport.HighPerformanceRendering = true
+			m.viewport.SetContent(m.issues.Issues[m.list.Cursor()].Fields.Description)
+			m.ready = true
+
+			// This is only necessary for high performance rendering, which in
+			// most cases you won't need.
+			//
+			// Render the viewport one line below the header.
+			//m.viewport.YPosition = headerHeight + 1
+
+		} else {
+			m.viewport.Width = contentWidth
+			m.viewport.Height = msg.Height
+		}
+		return m, nil
 	}
 
 	if m.typing {
@@ -169,12 +228,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
-	return m, cmd
+	cmds = append(cmds, cmd)
+
+	m.viewport, cmd = m.viewport.Update(msg)
+	cmds = append(cmds, cmd)
+
+	return m, tea.Batch(cmds...)
 }
 
 func (m Model) View() string {
+	if !m.ready {
+		return fmt.Sprintf("\ninitializing %s", m.spinner.View())
+	}
 	if m.typing {
 		return fmt.Sprintf("Enter location:\n%s", m.textInput.View())
 	}
@@ -187,5 +253,5 @@ func (m Model) View() string {
 		return fmt.Sprintf("Could not fetch issues: %v", err)
 	}
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, m.list.View(), style.Render("Ticket details"))
+	return lipgloss.JoinHorizontal(lipgloss.Top, m.list.View(), m.viewport.View())
 }

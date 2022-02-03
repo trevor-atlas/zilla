@@ -10,7 +10,7 @@ type Time time.Time
 // Date represents the Date definition of JIRA as a time.Time of go
 type Date time.Time
 
-type jiraUser struct {
+type IssueUser struct {
 	Active       bool   `json:"active"`
 	TimeZone     string `json:"timeZone"`
 	DisplayName  string `json:"displayName"`
@@ -22,54 +22,66 @@ type jiraUser struct {
 	Self         string
 }
 
-type jiraComment struct {
+type IssueComment struct {
 	ID           string
 	Self         string
-	Author       jiraUser
+	Author       IssueUser
 	Body         string
-	UpdateAuthor jiraUser
+	UpdateAuthor IssueUser
 	Created      *Time
 	Updated      *Time
 	Total        int
 }
 
+type IssueFields struct {
+	Summary     string    // title of jira issue
+	Created     *Time     `json:"created"`     // 2018-05-25T04:18:06.836-0500
+	Updated     *Time     `json:"updated"`     // 2018-06-11T22:23:03.606-0500
+	Description string    `json:"description"` // description of Jira issue
+	Reporter    IssueUser `json:"reporter"`
+	Assignee    IssueUser `json:"assignee"`
+	Comment     IssueComments
+	Priority    IssuePriority
+	IssueType   IssueType
+	Status      IssueStatus
+	Project     IssueProject
+}
+
+type IssueComments struct {
+	Comments []IssueComment
+}
+
+type IssuePriority struct {
+	Name string `json:"priority"` // Medium
+}
+
+type IssueType struct {
+	Name    string `json:"name"` // Bug, Task, Story
+	Subtask bool   `json:"subtask"`
+	IconURL string `json:"iconUrl"`
+}
+
+type IssueStatus struct {
+	Description    string
+	Name           string
+	StatusCategory struct {
+		Key  string
+		Name string
+		ID   int
+	}
+}
+
+type IssueProject struct {
+	Key  string
+	Name string
+}
+
 // JiraIssue describes the response for a single jira issue
 type JiraIssue struct {
-	ID     string `json:"id"`
-	Self   string `json:"self"` // url to request this issue
-	Key    string `json:"key"`  // XYZ-1234
-	Fields struct {
-		Summary     string   // title of jira issue
-		Created     *Time    `json:"created"`     // 2018-05-25T04:18:06.836-0500
-		Updated     *Time    `json:"updated"`     // 2018-06-11T22:23:03.606-0500
-		Description string   `json:"description"` // description of Jira issue
-		Reporter    jiraUser `json:"reporter"`
-		Assignee    jiraUser `json:"assignee"`
-		Comment     struct {
-			Comments []jiraComment
-		}
-		Priority struct {
-			Name string `json:"priority"` // Medium
-		}
-		IssueType struct {
-			Name    string `json:"name"` // Bug, Task, Story
-			Subtask bool   `json:"subtask"`
-			IconURL string `json:"iconUrl"`
-		}
-		Status struct {
-			Description    string
-			Name           string
-			StatusCategory struct {
-				Key  string
-				Name string
-				ID   int
-			}
-		}
-		Project struct {
-			Key  string
-			Name string
-		}
-	} `json:"fields"`
+	ID     string      `json:"id"`
+	Self   string      `json:"self"` // url to request this issue
+	Key    string      `json:"key"`  // XYZ-1234
+	Fields IssueFields `json:"fields"`
 }
 
 type JiraIssues struct {
